@@ -1,71 +1,71 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Dynamic Pricing Calculator</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <meta charset="UTF-8">
+    <title>Dynamic Pricing</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 </head>
 <body>
-  <div class="container">
-    <h1>Dynamic Pricing Calculator</h1>
-    <div class="form-group">
-      <label for="propertyUid">Select Property UID:</label>
-      <select id="propertyUid" class="form-control"></select>
-    </div>
-    <div class="form-group">
-      <label for="checkIn">Check-In Date:</label>
-      <input type="date" id="checkIn" class="form-control">
-    </div>
-    <div class="form-group">
-      <label for="checkOut">Check-Out Date:</label>
-      <input type="date" id="checkOut" class="form-control">
-    </div>
-    <button id="calculate" class="btn btn-primary">Calculate Price</button>
-    <h2 id="result"></h2>
-  </div>
 
-  <script>
+<h1>Dynamic Pricing for Properties</h1>
+
+<form id="pricing-form">
+    <!-- Dropdown for selecting properties -->
+    <label for="selected_properties">Select Properties:</label>
+    <select id="selected_properties" name="selected_uids[]" multiple="multiple" size="10">
+        {% for property in properties %}
+            <option value="{{ property.uid }}">
+                {{ property.name if property.name else property.uid }}
+            </option>
+        {% endfor %}
+    </select>
+    <br>
+
+    <!-- Fields for date range, new price, and minimum number of nights -->
+    <label for="date_range">Date Range:</label>
+    <input type="text" id="date_range" name="date_range">
+    <br>
+
+    <label for="new_price">New Price:</label>
+    <input type="number" id="new_price" name="new_price">
+    <br>
+
+    <label for="min_nights">Minimum Nights:</label>
+    <input type="number" id="min_nights" name="min_nights" value="2">
+    <br>
+
+    <!-- Submit button -->
+    <button type="submit">Update Pricing</button>
+</form>
+
+<script>
     $(document).ready(function(){
-      // Fetch available UIDs from the server
-      $.get("/get_property_uids")
-      .done(function(data) {
-        const uids = data.uids;
-        if (uids && Array.isArray(uids)) {
-          for(const uid of uids) {
-            $('#propertyUid').append(`<option value="${uid}">${uid}</option>`);
-          }
-        } else {
-          console.log("Unexpected data format:", data);
-        }
-      })
-      .fail(function(jqXHR, textStatus, errorThrown) {
-        console.log("Failed to get property UIDs:", textStatus, errorThrown);
-      });
-
-      // Calculate the final price when the button is clicked
-      $('#calculate').click(function(){
-        const propertyUid = $('#propertyUid').val();
-        const checkIn = $('#checkIn').val();
-        const checkOut = $('#checkOut').val();
-        $.ajax({
-          url: "/calculate_price",
-          method: "POST",
-          contentType: "application/json",
-          data: JSON.stringify({ propertyUid, checkIn, checkOut })
-        })
-        .done(function(data) {
-          if (data && data.final_price != null) {
-            $('#result').html(`Final Price: $${data.final_price}`);
-          } else {
-            console.log("Unexpected data format:", data);
-          }
-        })
-        .fail(function(jqXHR, textStatus, errorThrown) {
-          console.log("Failed to calculate price:", textStatus, errorThrown);
+        $("#pricing-form").submit(function(event){
+            event.preventDefault();
+            const selectedUids = $("#selected_properties").val();
+            const dateRange = $("#date_range").val();
+            const newPrice = $("#new_price").val();
+            const minNights = $("#min_nights").val();
+            $.ajax({
+                url: '/update_pricing',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    'selected_uids': selectedUids,
+                    'date_range': dateRange,
+                    'new_price': newPrice,
+                    'min_nights': minNights
+                }),
+                success: function(response){
+                    alert("Pricing updated successfully!");
+                },
+                error: function(error){
+                    alert("An error occurred.");
+                }
+            });
         });
-      });
     });
-  </script>
+</script>
+
 </body>
 </html>
