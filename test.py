@@ -7,6 +7,7 @@ app = Flask(__name__)
 
 # Your existing API details for properties
 url_properties = "https://api.hostfully.com/v2/properties?agencyUid=d3dcb567-03dc-4c17-8918-e119b0bd579d&limit=20&offset=0"
+url_pricing = "https://api.hostfully.com/v2/pricingPeriods?propertyUid={property_uid}"
 headers = {
     "accept": "application/json",
     "X-HOSTFULLY-APIKEY": "tAryEQrD4HRUqAxF"
@@ -14,8 +15,17 @@ headers = {
 
 
 def fetch_base_rate(uid):
-    # Simulated function to fetch base rate from API
-    return 100
+    # Make an API call to fetch pricing information for the property with UID=uid
+    pricing_url = url_pricing.format(property_uid=uid)
+    response = requests.get(pricing_url, headers=headers)
+    pricing_data = json.loads(response.text)
+
+    # Extract the base rate from the pricing_data (assuming the key is 'baseRate')
+    # Here, we just take the first pricing period's base rate for demonstration.
+    # You may need to adapt this logic as per your exact requirement.
+    base_rate = pricing_data.get('pricingPeriods', [{}])[0].get('baseRate', 0)
+
+    return base_rate
 
 
 def update_pricing_period(uid, calculated_price, date_range, min_nights):
