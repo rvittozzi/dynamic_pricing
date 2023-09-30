@@ -28,23 +28,20 @@ def fetch_property_names(uids):
 
 
 def fetch_base_rate(uid):
-    # Make an API call to fetch pricing information for the property with UID=uid
-    pricing_url = url_pricing.format(property_uid=uid)
-    response = requests.get(pricing_url, headers=headers)
+    # Make an API call to fetch property information for the property with UID=uid
+    property_url = f"https://api.hostfully.com/v2/properties/{uid}"
+    response = requests.get(property_url, headers=headers)
 
     # Check if the request was successful (HTTP status code 200)
     if response.status_code == 200:
-        pricing_data = json.loads(response.text)
+        property_data = json.loads(response.text)
 
-        # Extract the base rate from the pricing_data (assuming the key is 'baseDailyRate')
-        # Here, we just take the first pricing period's base rate for demonstration.
-        # You may need to adapt this logic as per your exact requirement.
-        base_rate = pricing_data.get('pricingPeriods', [{}])[0].get('baseDailyRate', 0)  # Note the change here
+        # Extract the baseDailyRate from the property_data
+        base_daily_rate = property_data.get('baseDailyRate', 0)
 
-        return base_rate
+        return base_daily_rate
     else:
-        # Handle the case where the API request was not successful
-        print(f"Failed to fetch pricing information. Status code: {response.status_code}")
+        print(f"Failed to fetch property information. Status code: {response.status_code}")
         return None  # Return None to indicate failure
 
 
@@ -95,7 +92,7 @@ def index():
     return render_template('index.html', properties=property_data)
 
 
-@app.route('/update_pricing', methods=['POST'])
+@app.route('/update_pricing', methods=['GET'])
 def update_pricing():
     selected_uids = request.json.get('selected_uids', [])
     date_range = request.json.get('date_range', '')
@@ -112,16 +109,40 @@ def update_pricing():
 
         calculated_price = dynamic_pricing(base_rate, is_weekend, days_until_booking, season)
 
-        # Fetch pricing rules for the property
-        pricing_rules = fetch_pricing_rules(uid)
+        payload = {
+            "propertyUid": uid,
+            "from": "2023-09-30",
+            "to": "2023-09-30",
+            "amount": calculated_price,
+            "minimumStay": "1",
+            "isCheckinAllowed": "string",
+            "isCheckoutAllowed": "string"
+        }
 
-        # Apply pricing rules here based on your specific logic using pricing_rules
+        response = requests.post(url, json=payload, headers=headers)
 
-        calculated_prices.append({'uid': uid, 'calculated_price': calculated_price})
+        if response.status_code == 200:
+            print(f"Successfully updated pricing for {uid}")
+        else:
+            print(f"Failed to update pricing for {uid}. Response: {response.text}")
+
+        calculated_prices.append({'uid': uid, 'amount': calculated_price})
+
         update_pricing_period(uid, calculated_price, date_range, min_nights)
         print(f"Final Calculated Price for UID {uid}: {calculated_price}")  # Printing the final price to the console
 
     return jsonify({"status": "success", "calculated_prices": calculated_prices})
+
+
+@app.route('/show_price', methods=['POST'])
+def show_price():
+    property_uid = request.form.get('property_uid')
+    base_rate = fetch_base_rate(property_uid)
+
+    if base_rate is not None:
+        return f"The base rate for selected property is: {base_rate}"
+    else:
+        return "Failed to fetch the base rate for the selected property."
 
 
 if __name__ == '__main__':

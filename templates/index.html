@@ -2,70 +2,32 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Dynamic Pricing</title>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <title>Property Pricing</title>
 </head>
 <body>
 
-<h1>Dynamic Pricing for Properties</h1>
+    <h1>Property Pricing Tool</h1>
 
-<form id="pricing-form">
-    <!-- Dropdown for selecting properties -->
-    <label for="selected_properties">Select Properties:</label>
-    <select id="selected_properties" name="selected_uids[]" multiple="multiple" size="10">
-        {% for property in properties %}
-            <option value="{{ property.uid }}">
-                {{ property.name if property.name else property.uid }}
-            </option>
-        {% endfor %}
-    </select>
-    <br>
+    <!-- Dropdown to select property -->
+    <form action="/show_price" method="post" id="property-form">
+        <label for="property-select">Select a property:</label>
+        <select name="property_uid" id="property-select">
+            {% for property in properties %}
+                <option value="{{ property.uid }}">{{ property.name }} ({{ property.uid }})</option>
+            {% endfor %}
+        </select>
+        <input type="submit" value="Get Base Price">
+    </form>
 
-    <!-- Fields for date range, new price, and minimum number of nights -->
-    <label for="date_range">Date Range:</label>
-    <input type="text" id="date_range" name="date_range">
-    <br>
+    <!-- Additional UI components for future functionality -->
+    <div id="additional-info">
+        <!-- Add more UI components here, such as date pickers for the date range, minimum nights, etc. -->
+    </div>
 
-    <label for="new_price">New Price:</label>
-    <input type="number" id="new_price" name="new_price">
-    <br>
-
-    <label for="min_nights">Minimum Nights:</label>
-    <input type="number" id="min_nights" name="min_nights" value="2">
-    <br>
-
-    <!-- Submit button -->
-    <button type="submit">Update Pricing</button>
-</form>
-
-<script>
-    $(document).ready(function(){
-        $("#pricing-form").submit(function(event){
-            event.preventDefault();
-            const selectedUids = $("#selected_properties").val();
-            const dateRange = $("#date_range").val();
-            const newPrice = $("#new_price").val();
-            const minNights = $("#min_nights").val();
-            $.ajax({
-                url: '/update_pricing',
-                type: 'POST',
-                contentType: 'application/json',
-                data: JSON.stringify({
-                    'selected_uids': selectedUids,
-                    'date_range': dateRange,
-                    'new_price': newPrice,
-                    'min_nights': minNights
-                }),
-                success: function(response){
-                    alert("Pricing updated successfully!");
-                },
-                error: function(error){
-                    alert("An error occurred.");
-                }
-            });
-        });
-    });
-</script>
+    <!-- JavaScript section -->
+    <script>
+        // Add JavaScript code here for more interactive features
+    </script>
 
 </body>
 </html>
