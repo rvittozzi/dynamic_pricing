@@ -13,18 +13,39 @@ headers = {
 }
 
 
+def fetch_property_names(uids):
+    property_names = []
+
+    for uid in uids:
+        response = requests.get(f"https://api.hostfully.com/v2/properties/{uid}", headers=headers)
+        property_data = json.loads(response.text)
+        if 'name' in property_data:
+            property_names.append(property_data['name'])
+        else:
+            property_names.append('Name not found')
+
+    return property_names
+
+
 def fetch_base_rate(uid):
     # Make an API call to fetch pricing information for the property with UID=uid
     pricing_url = url_pricing.format(property_uid=uid)
     response = requests.get(pricing_url, headers=headers)
-    pricing_data = json.loads(response.text)
 
-    # Extract the base rate from the pricing_data (assuming the key is 'baseRate')
-    # Here, we just take the first pricing period's base rate for demonstration.
-    # You may need to adapt this logic as per your exact requirement.
-    base_rate = pricing_data.get('pricingPeriods', [{}])[0].get('baseRate', 0)
+    # Check if the request was successful (HTTP status code 200)
+    if response.status_code == 200:
+        pricing_data = json.loads(response.text)
 
-    return base_rate
+        # Extract the base rate from the pricing_data (assuming the key is 'baseDailyRate')
+        # Here, we just take the first pricing period's base rate for demonstration.
+        # You may need to adapt this logic as per your exact requirement.
+        base_rate = pricing_data.get('pricingPeriods', [{}])[0].get('baseDailyRate', 0)  # Note the change here
+
+        return base_rate
+    else:
+        # Handle the case where the API request was not successful
+        print(f"Failed to fetch pricing information. Status code: {response.status_code}")
+        return None  # Return None to indicate failure
 
 
 def update_pricing_period(uid, calculated_price, date_range, min_nights):
@@ -36,31 +57,26 @@ def update_pricing_period(uid, calculated_price, date_range, min_nights):
 def dynamic_pricing(base_rate, is_weekend, days_until_booking, season):
     calculated_price = base_rate
 
-    if is_weekend:
-        calculated_price += (base_rate * 0.2)
-    if days_until_booking <= 7:
-        calculated_price -= (base_rate * 0.1)
-    if days_until_booking >= 30:
-        calculated_price -= (base_rate * 0.05)
-    if season == 'summer':
-        calculated_price += (base_rate * 0.15)
-    elif season == 'winter':
-        calculated_price -= (base_rate * 0.05)
-
     return calculated_price
 
 
-# Define a function to fetch property names
-def fetch_property_names(uids):
-    property_names = []
-    for uid in uids:
-        response = requests.get(f"https://api.hostfully.com/v2/properties/{uid}", headers=headers)
-        property_data = json.loads(response.text)
-        if 'name' in property_data:
-            property_names.append(property_data['name'])  # Assuming the key for the property name is 'name'
-        else:
-            property_names.append('Name not found')  # Handle cases where the name is not available
-    return property_names
+def fetch_pricing_rules(property_uid):
+    # Make an API call to fetch pricing rules for the property with the given UID
+    pricing_rules_url = f"https://api.hostfully.com/v2/pricingrules/{property_uid}"
+    response = requests.get(pricing_rules_url, headers=headers)
+
+    # Check if the request was successful (HTTP status code 200)
+    if response.status_code == 200:
+        pricing_rules_data = json.loads(response.text)
+
+        # Extract pricing rules from the response (assuming the key is 'pricingRules')
+        pricing_rules = pricing_rules_data.get('pricingRules', [])
+
+        return pricing_rules
+    else:
+        # Handle the case where the API request was not successful
+        print(f"Failed to fetch pricing rules. Status code: {response.status_code}")
+        return []  # Return an empty list to indicate no pricing rules available
 
 
 @app.route('/')
@@ -83,8 +99,9 @@ def index():
 def update_pricing():
     selected_uids = request.json.get('selected_uids', [])
     date_range = request.json.get('date_range', '')
-    new_price = request.json.get('new_price', 0)
     min_nights = request.json.get('min_nights', 2)
+
+    calculated_prices = []  # List to store all calculated prices
 
     for uid in selected_uids:
         base_rate = fetch_base_rate(uid)
@@ -94,9 +111,17 @@ def update_pricing():
         season = 'summer'  # Replace with actual logic
 
         calculated_price = dynamic_pricing(base_rate, is_weekend, days_until_booking, season)
-        update_pricing_period(uid, calculated_price, date_range, min_nights)
 
-    return jsonify({"status": "success"})
+        # Fetch pricing rules for the property
+        pricing_rules = fetch_pricing_rules(uid)
+
+        # Apply pricing rules here based on your specific logic using pricing_rules
+
+        calculated_prices.append({'uid': uid, 'calculated_price': calculated_price})
+        update_pricing_period(uid, calculated_price, date_range, min_nights)
+        print(f"Final Calculated Price for UID {uid}: {calculated_price}")  # Printing the final price to the console
+
+    return jsonify({"status": "success", "calculated_prices": calculated_prices})
 
 
 if __name__ == '__main__':
