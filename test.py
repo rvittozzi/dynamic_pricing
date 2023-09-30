@@ -1,7 +1,6 @@
 from flask import Flask, render_template, request, jsonify
 import requests
 import json
-from datetime import datetime, timedelta  # for date manipulations
 
 app = Flask(__name__)
 
@@ -51,15 +50,31 @@ def dynamic_pricing(base_rate, is_weekend, days_until_booking, season):
     return calculated_price
 
 
+# Define a function to fetch property names
+def fetch_property_names(uids):
+    property_names = []
+    for uid in uids:
+        response = requests.get(f"https://api.hostfully.com/v2/properties/{uid}", headers=headers)
+        property_data = json.loads(response.text)
+        if 'name' in property_data:
+            property_names.append(property_data['name'])  # Assuming the key for the property name is 'name'
+        else:
+            property_names.append('Name not found')  # Handle cases where the name is not available
+    return property_names
+
+
 @app.route('/')
 def index():
     response = requests.get(url_properties, headers=headers)
     properties = json.loads(response.text)
 
     property_data = []
-    for uid in properties['propertiesUids']:  # Assuming 'propertiesUids' contains list of UIDs as strings
-        # Directly use uid because it's a string
-        property_data.append({'uid': uid, 'name': ''})  # Assuming you will populate name later or it's not necessary
+    if 'propertiesUids' in properties:
+        uids = properties['propertiesUids']
+        property_names = fetch_property_names(uids)
+
+        for uid, name in zip(uids, property_names):
+            property_data.append({'uid': uid, 'name': name})
 
     return render_template('index.html', properties=property_data)
 
