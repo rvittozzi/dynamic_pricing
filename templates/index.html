@@ -1,33 +1,29 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
     <title>Property Pricing</title>
 </head>
 <body>
-
-    <h1>Property Pricing Tool</h1>
-
-    <!-- Dropdown to select property -->
-    <form action="/show_price" method="post" id="property-form">
-        <label for="property-select">Select a property:</label>
-        <select name="property_uid" id="property-select">
+    <form method="post" action="/show_price">
+        <label for="property_uid">Select Property:</label>
+        <select name="property_uid" id="property_uid">
             {% for property in properties %}
-                <option value="{{ property.uid }}">{{ property.name }} ({{ property.uid }})</option>
+                <option value="{{ property.uid }}">{{ property.name }}</option>
             {% endfor %}
         </select>
-        <input type="submit" value="Get Base Price">
+        <br>
+
+        <label for="from_date">From Date:</label>
+        <input type="date" id="from_date" name="from_date">
+        <br>
+        <label for="to_date">To Date:</label>
+        <input type="date" id="to_date" name="to_date">
+        <br>
+        <label for="min_nights">Minimum Nights:</label>
+        <input type="number" id="min_nights" name="min_nights" min="2">
+        <br>
+
+        <input type="submit" value="Submit">
     </form>
-
-    <!-- Additional UI components for future functionality -->
-    <div id="additional-info">
-        <!-- Add more UI components here, such as date pickers for the date range, minimum nights, etc. -->
-    </div>
-
-    <!-- JavaScript section -->
-    <script>
-        // Add JavaScript code here for more interactive features
-    </script>
-
 </body>
 </html>

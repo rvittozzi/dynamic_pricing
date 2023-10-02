@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, jsonify
 import requests
 import json
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 
@@ -45,35 +46,78 @@ def fetch_base_rate(uid):
         return None  # Return None to indicate failure
 
 
+def fetch_price_for_date(uid, date):
+    # Assume API_URL is where you fetch the price for a specific date
+    url = f"https://api.hostfully.com/v2/pricingForDate?propertyUid={uid}&date={date}"
+    response = requests.get(url, headers=headers)
+
+    if response.status_code == 200:
+        data = json.loads(response.text)
+        return data.get('amount', 0)  # Changed 'price' to 'amount'
+    else:
+        return 0  # Return 0 if the API call fails
+
+
 def update_pricing_period(uid, calculated_price, date_range, min_nights):
     # Simulated function to update the pricing period
     print(
         f"Updating pricing for UID {uid} with calculated price {calculated_price}, date range {date_range}, and minimum nights {min_nights}")
 
 
-def dynamic_pricing(base_rate, is_weekend, days_until_booking, season):
+def dynamic_pricing(base_rate, pricing_rules, stay_date, num_nights):
+    # Starting with the base_rate
     calculated_price = base_rate
+
+    for rule in pricing_rules:
+        price_rule_type = rule.get('priceRuleType')
+        threshold = rule.get('threshold')
+        price_change_type = rule.get('priceChangeType')
+        price_change = rule.get('priceChange')
+
+        # Increase the price by 20% when a stay is shorter than 2 days
+        if price_rule_type == "STAY_IS_SHORTER_THAN_X_DAYS" and num_nights < threshold:
+            if price_change_type == "PERCENT":
+                calculated_price *= (1 + price_change / 100)
+
+        # Reduce the price by 5% when a stay is longer than 7 days
+        # Reduce the price by 10% when a stay is longer than 14 days
+        if price_rule_type == "STAY_IS_LONGER_THAN_X_DAYS" and num_nights > threshold:
+            if price_change_type == "PERCENT":
+                calculated_price *= (1 - price_change / 100)
 
     return calculated_price
 
 
-def fetch_pricing_rules(property_uid):
-    # Make an API call to fetch pricing rules for the property with the given UID
-    pricing_rules_url = f"https://api.hostfully.com/v2/pricingrules/{property_uid}"
-    response = requests.get(pricing_rules_url, headers=headers)
 
-    # Check if the request was successful (HTTP status code 200)
+def fetch_pricing_rules(uid):
+    url = f"https://api.hostfully.com/v2/pricingrules/{uid}"
+    response = requests.get(url, headers=headers)
     if response.status_code == 200:
-        pricing_rules_data = json.loads(response.text)
-
-        # Extract pricing rules from the response (assuming the key is 'pricingRules')
-        pricing_rules = pricing_rules_data.get('pricingRules', [])
-
-        return pricing_rules
+        data = json.loads(response.text)
+        return data.get('pricingRules', [])  # changed 'rules' to 'pricingRules'
     else:
-        # Handle the case where the API request was not successful
         print(f"Failed to fetch pricing rules. Status code: {response.status_code}")
-        return []  # Return an empty list to indicate no pricing rules available
+        return []
+
+
+def fetch_pricing_rules_keys(uid):
+    url = f"https://api.hostfully.com/v2/pricingrules/{uid}"
+    response = requests.get(url, headers=headers)
+
+    if response.status_code == 200:
+        data = json.loads(response.text)
+
+        print("Root-level keys:")
+        for key in data.keys():
+            print(key)
+
+        print("\nKeys within each rule:")
+        if 'pricingRules' in data:  # changed 'rules' to 'pricingRules'
+            if data['pricingRules']:
+                for key in data['pricingRules'][0].keys():
+                    print(key)
+    else:
+        print(f"Failed to fetch pricing rules. Status code: {response.status_code}")
 
 
 @app.route('/')
@@ -92,57 +136,45 @@ def index():
     return render_template('index.html', properties=property_data)
 
 
-@app.route('/update_pricing', methods=['GET'])
-def update_pricing():
-    selected_uids = request.json.get('selected_uids', [])
-    date_range = request.json.get('date_range', '')
-    min_nights = request.json.get('min_nights', 2)
-
-    calculated_prices = []  # List to store all calculated prices
-
-    for uid in selected_uids:
-        base_rate = fetch_base_rate(uid)
-
-        is_weekend = False  # Replace with actual logic
-        days_until_booking = 10  # Replace with actual logic
-        season = 'summer'  # Replace with actual logic
-
-        calculated_price = dynamic_pricing(base_rate, is_weekend, days_until_booking, season)
-
-        payload = {
-            "propertyUid": uid,
-            "from": "2023-09-30",
-            "to": "2023-09-30",
-            "amount": calculated_price,
-            "minimumStay": "1",
-            "isCheckinAllowed": "string",
-            "isCheckoutAllowed": "string"
-        }
-
-        response = requests.post(url, json=payload, headers=headers)
-
-        if response.status_code == 200:
-            print(f"Successfully updated pricing for {uid}")
-        else:
-            print(f"Failed to update pricing for {uid}. Response: {response.text}")
-
-        calculated_prices.append({'uid': uid, 'amount': calculated_price})
-
-        update_pricing_period(uid, calculated_price, date_range, min_nights)
-        print(f"Final Calculated Price for UID {uid}: {calculated_price}")  # Printing the final price to the console
-
-    return jsonify({"status": "success", "calculated_prices": calculated_prices})
-
-
 @app.route('/show_price', methods=['POST'])
 def show_price():
     property_uid = request.form.get('property_uid')
-    base_rate = fetch_base_rate(property_uid)
+    from_date = request.form.get('from_date')
+    to_date = request.form.get('to_date')
+    minimum_stay = max(int(request.form.get('minimum_stay', 2)), 2)
 
-    if base_rate is not None:
-        return f"The base rate for selected property is: {base_rate}"
-    else:
-        return "Failed to fetch the base rate for the selected property."
+    # Debugging: Fetch and print keys from the pricing rules API
+    print("Debugging: Fetching pricing rule keys...")
+    fetch_pricing_rules_keys(property_uid)
+
+    # Fetch the pricing rules for this property
+    pricing_rules = fetch_pricing_rules(property_uid)
+
+    from_date_obj = datetime.strptime(from_date, '%Y-%m-%d')
+    to_date_obj = datetime.strptime(to_date, '%Y-%m-%d')
+    num_nights = (to_date_obj - from_date_obj).days
+
+    if num_nights < minimum_stay:
+        return "The number of nights should be at least the minimum stay."
+
+    total_price = 0
+
+    for i in range(num_nights):
+        day = from_date_obj + timedelta(days=i)
+        daily_rate = fetch_price_for_date(property_uid, day.strftime('%Y-%m-%d'))
+
+        if daily_rate == 0:
+            base_rate = fetch_base_rate(property_uid)
+            if base_rate is None:
+                return "Failed to fetch base rate for the property."
+            daily_rate = base_rate
+
+        # Apply dynamic pricing logic
+        daily_rate = dynamic_pricing(daily_rate, pricing_rules, day, num_nights)
+
+        total_price += daily_rate
+
+    return f"The total price for the property from {from_date} to {to_date} is: {total_price}"
 
 
 if __name__ == '__main__':
