@@ -3,6 +3,8 @@ import requests
 import json
 from datetime import datetime, timedelta
 import math
+from apscheduler.schedulers.background import BackgroundScheduler
+
 
 app = Flask(__name__)
 
@@ -152,6 +154,47 @@ def apply_gap_pricing(daily_rate, day, gap_sizes, gap_discounts):
         if detected_gap == size:
             return daily_rate * (1 - percent / 100)
     return daily_rate
+
+
+def update_all_properties_for_next_month():
+    today = datetime.today()
+    one_month_later = today + timedelta(days=30)
+
+    response = requests.get(url_properties, headers=headers)
+    properties = json.loads(response.text)
+
+    if 'propertiesUids' not in properties:
+        print('No property UIDs found.')
+        return
+
+    uids = properties['propertiesUids']
+
+    for uid in uids:
+        base_rate = fetch_base_rate(uid)
+        pricing_rules = fetch_pricing_rules(uid)
+        for n in range(31):  # 0 to 30 for each day in the next month
+            day = today + timedelta(days=n)
+            num_nights = (one_month_later - day).days
+
+            daily_rate = fetch_price_for_date(uid, day.strftime('%Y-%m-%d'))
+            if daily_rate == 0:
+                daily_rate = base_rate
+
+            daily_rate = dynamic_pricing(daily_rate, pricing_rules, day, num_nights)
+
+            # Add your logic to apply weekend rates, last-minute discounts, etc.
+            # For example:
+            # daily_rate = apply_weekend_rate(daily_rate, ...)
+
+            # Assuming update_pricing_period updates the price in your system
+            update_pricing_period(uid, daily_rate,
+                                  f"{day.strftime('%Y-%m-%d')} to {one_month_later.strftime('%Y-%m-%d')}", 1)
+
+
+scheduler = BackgroundScheduler()
+scheduler.add_job(func=update_all_properties_for_next_month, trigger="interval", days=1)
+scheduler.start()
+
 
 
 @app.route('/')
