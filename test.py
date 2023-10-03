@@ -143,6 +143,17 @@ def apply_seasonal_rate(daily_rate, day, seasonal_rates):
     return daily_rate
 
 
+def apply_gap_pricing(daily_rate, day, gap_sizes, gap_discounts):
+    # Simulate detecting a gap in the booking schedule.
+    # Replace this with real logic to detect gaps in your booking data.
+    detected_gap = 3
+
+    for size, percent in zip(gap_sizes, gap_discounts):
+        if detected_gap == size:
+            return daily_rate * (1 - percent / 100)
+    return daily_rate
+
+
 @app.route('/')
 def index():
     response = requests.get(url_properties, headers=headers)
@@ -182,19 +193,21 @@ def show_price():
 
     total_price = 0
 
+    # For demonstration, defining gap sizes and discounts
+    gap_sizes = [2, 3, 4]
+    gap_discounts = [10, 20, 30]
+    minimum_stay_applied = minimum_stay  # Initialize minimum_stay_applied
+
     for i in range(num_nights):
         day = from_date_obj + timedelta(days=i)
 
-        # Ensure daily_rate is defined before passing it to dynamic_pricing
         daily_rate = fetch_price_for_date(property_uid, day.strftime('%Y-%m-%d'))
         if daily_rate == 0:
             base_rate = fetch_base_rate(property_uid)
             if base_rate is None:
                 return "Failed to fetch base rate for the property."
             daily_rate = base_rate
-        # Now daily_rate is guaranteed to have a value
-        daily_rate = dynamic_pricing(daily_rate, pricing_rules, day, num_nights)
-        # Apply dynamic pricing logic
+
         daily_rate = dynamic_pricing(daily_rate, pricing_rules, day, num_nights)
 
         # Apply weekend rate
@@ -210,11 +223,20 @@ def show_price():
         ]
         daily_rate = apply_seasonal_rate(daily_rate, day, seasonal_rates)
 
+        # Apply gap pricing
+        daily_rate = apply_gap_pricing(daily_rate, day, gap_sizes, gap_discounts)
+
         total_price += daily_rate
 
-        total_price = math.ceil(total_price)
+    # If a gap of less than 2 days is detected, set minimum_stay to 1
+    # This is a placeholder; replace with your real gap-detection logic
+    detected_gap = 1  # Placeholder; replace with real gap detection
+    if detected_gap < 2:
+        minimum_stay_applied = 1
 
-    return f"The total price for the property from {from_date} to {to_date} is: {total_price}"
+    total_price = math.ceil(total_price)
+
+    return f"The total price for the property from {from_date} to {to_date} is: {total_price}. Minimum stay applied: {minimum_stay_applied}"
 
 
 if __name__ == '__main__':
