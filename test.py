@@ -5,10 +5,8 @@ from datetime import datetime, timedelta
 import math
 from apscheduler.schedulers.background import BackgroundScheduler
 
-
 app = Flask(__name__)
 
-# Your existing API details for properties
 url_properties = "https://api.hostfully.com/v2/properties?agencyUid=d3dcb567-03dc-4c17-8918-e119b0bd579d&limit=20&offset=0"
 url_pricing = "https://api.hostfully.com/v2/pricingPeriods?propertyUid={property_uid}"
 headers = {
@@ -32,43 +30,37 @@ def fetch_property_names(uids):
 
 
 def fetch_base_rate(uid):
-    # Make an API call to fetch property information for the property with UID=uid
     property_url = f"https://api.hostfully.com/v2/properties/{uid}"
     response = requests.get(property_url, headers=headers)
 
-    # Check if the request was successful (HTTP status code 200)
     if response.status_code == 200:
         property_data = json.loads(response.text)
 
-        # Extract the baseDailyRate from the property_data
         base_daily_rate = property_data.get('baseDailyRate', 0)
 
         return base_daily_rate
     else:
         print(f"Failed to fetch property information. Status code: {response.status_code}")
-        return None  # Return None to indicate failure
+        return None
 
 
 def fetch_price_for_date(uid, date):
-    # Assume API_URL is where you fetch the price for a specific date
     url = f"https://api.hostfully.com/v2/pricingForDate?propertyUid={uid}&date={date}"
     response = requests.get(url, headers=headers)
 
     if response.status_code == 200:
         data = json.loads(response.text)
-        return data.get('amount', 0)  # Changed 'price' to 'amount'
+        return data.get('amount', 0)
     else:
-        return 0  # Return 0 if the API call fails
+        return 0
 
 
 def update_pricing_period(uid, calculated_price, date_range, min_nights):
-    # Simulated function to update the pricing period
     print(
         f"Updating pricing for UID {uid} with calculated price {calculated_price}, date range {date_range}, and minimum nights {min_nights}")
 
 
 def dynamic_pricing(base_rate, pricing_rules, stay_date, num_nights):
-    # Starting with the base_rate
     calculated_price = base_rate
 
     for rule in pricing_rules:
@@ -77,13 +69,10 @@ def dynamic_pricing(base_rate, pricing_rules, stay_date, num_nights):
         price_change_type = rule.get('priceChangeType')
         price_change = rule.get('priceChange')
 
-        # Increase the price by 20% when a stay is shorter than 2 days
         if price_rule_type == "STAY_IS_SHORTER_THAN_X_DAYS" and num_nights < threshold:
             if price_change_type == "PERCENT":
                 calculated_price *= (1 + price_change / 100)
 
-        # Reduce the price by 5% when a stay is longer than 7 days
-        # Reduce the price by 10% when a stay is longer than 14 days
         if price_rule_type == "STAY_IS_LONGER_THAN_X_DAYS" and num_nights > threshold:
             if price_change_type == "PERCENT":
                 calculated_price *= (1 - price_change / 100)
@@ -96,7 +85,7 @@ def fetch_pricing_rules(uid):
     response = requests.get(url, headers=headers)
     if response.status_code == 200:
         data = json.loads(response.text)
-        return data.get('pricingRules', [])  # changed 'rules' to 'pricingRules'
+        return data.get('pricingRules', [])
     else:
         print(f"Failed to fetch pricing rules. Status code: {response.status_code}")
         return []
@@ -114,7 +103,7 @@ def fetch_pricing_rules_keys(uid):
             print(key)
 
         print("\nKeys within each rule:")
-        if 'pricingRules' in data:  # changed 'rules' to 'pricingRules'
+        if 'pricingRules' in data:
             if data['pricingRules']:
                 for key in data['pricingRules'][0].keys():
                     print(key)
@@ -123,8 +112,8 @@ def fetch_pricing_rules_keys(uid):
 
 
 def apply_weekend_rate(daily_rate, day, weekend_increase_percent, min_weekend_nights):
-    if day.weekday() >= 5:  # 5 = Saturday, 6 = Sunday
-        if min_weekend_nights <= 1:  # If it's not mandatory to stay for more than one night during weekends
+    if day.weekday() >= 5:
+        if min_weekend_nights <= 1:
             return daily_rate * (1 + weekend_increase_percent / 100)
     return daily_rate
 
@@ -140,14 +129,12 @@ def apply_seasonal_rate(daily_rate, day, seasonal_rates):
     for season in seasonal_rates:
         start, end, percent, min_nights = season['start'], season['end'], season['percent'], season['min_nights']
         if start <= day <= end:
-            if min_nights <= 1:  # If there is no minimum night requirement for the season
+            if min_nights <= 1:
                 return daily_rate * (1 + percent / 100)
     return daily_rate
 
 
 def apply_gap_pricing(daily_rate, day, gap_sizes, gap_discounts):
-    # Simulate detecting a gap in the booking schedule.
-    # Replace this with real logic to detect gaps in your booking data.
     detected_gap = 3
 
     for size, percent in zip(gap_sizes, gap_discounts):
@@ -182,11 +169,6 @@ def update_all_properties_for_next_month():
 
             daily_rate = dynamic_pricing(daily_rate, pricing_rules, day, num_nights)
 
-            # Add your logic to apply weekend rates, last-minute discounts, etc.
-            # For example:
-            # daily_rate = apply_weekend_rate(daily_rate, ...)
-
-            # Assuming update_pricing_period updates the price in your system
             update_pricing_period(uid, daily_rate,
                                   f"{day.strftime('%Y-%m-%d')} to {one_month_later.strftime('%Y-%m-%d')}", 1)
 
@@ -194,7 +176,6 @@ def update_all_properties_for_next_month():
 scheduler = BackgroundScheduler()
 scheduler.add_job(func=update_all_properties_for_next_month, trigger="interval", days=1)
 scheduler.start()
-
 
 
 @app.route('/')
@@ -220,11 +201,9 @@ def show_price():
     to_date = request.form.get('to_date')
     minimum_stay = max(int(request.form.get('minimum_stay', 2)), 2)
 
-    # Debugging: Fetch and print keys from the pricing rules API
     print("Debugging: Fetching pricing rule keys...")
     fetch_pricing_rules_keys(property_uid)
 
-    # Fetch the pricing rules for this property
     pricing_rules = fetch_pricing_rules(property_uid)
 
     from_date_obj = datetime.strptime(from_date, '%Y-%m-%d')
@@ -236,10 +215,9 @@ def show_price():
 
     total_price = 0
 
-    # For demonstration, defining gap sizes and discounts
     gap_sizes = [2, 3, 4]
     gap_discounts = [10, 20, 30]
-    minimum_stay_applied = minimum_stay  # Initialize minimum_stay_applied
+    minimum_stay_applied = minimum_stay
 
     for i in range(num_nights):
         day = from_date_obj + timedelta(days=i)
@@ -271,8 +249,6 @@ def show_price():
 
         total_price += daily_rate
 
-    # If a gap of less than 2 days is detected, set minimum_stay to 1
-    # This is a placeholder; replace with your real gap-detection logic
     detected_gap = 1  # Placeholder; replace with real gap detection
     if detected_gap < 2:
         minimum_stay_applied = 1
