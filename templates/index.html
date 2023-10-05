@@ -4,7 +4,9 @@
     <title>Property Pricing</title>
 </head>
 <body>
+    <!-- Manual Pricing Query Form -->
     <form method="post" action="/show_price">
+        <h2>Manual Price Query</h2>
         <label for="property_uid">Select Property:</label>
         <select name="property_uid" id="property_uid">
             {% for property in properties %}
@@ -24,6 +26,16 @@
         <br>
 
         <input type="submit" value="Submit">
+    </form>
+
+    <!-- Automatic Daily Pricing Update Form -->
+    <form action="/update_selected_properties" method="post">
+        <h2>Select Properties for Daily Pricing Update</h2>
+        {% for property in properties %}
+            <input type="checkbox" name="selected_properties" value="{{ property.uid }}">
+            <label for="{{ property.uid }}">{{ property.name }}</label><br>
+        {% endfor %}
+        <input type="submit" value="Update Selected Properties">
     </form>
 </body>
 </html>

@@ -1,9 +1,11 @@
-from flask import Flask, render_template, request, jsonify
-import requests
 import json
-from datetime import datetime, timedelta
 import math
+from datetime import datetime, timedelta
+
+import requests
 from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
+from flask import Flask, render_template, request, redirect
 
 app = Flask(__name__)
 
@@ -55,9 +57,24 @@ def fetch_price_for_date(uid, date):
         return 0
 
 
-def update_pricing_period(uid, calculated_price, date_range, min_nights):
-    print(
-        f"Updating pricing for UID {uid} with calculated price {calculated_price}, date range {date_range}, and minimum nights {min_nights}")
+def update_pricing_period(uid, calculated_price, from_date, to_date, min_nights):
+    # Create the data payload for the update request
+    payload = {
+        "amount": calculated_price,
+        "from": from_date,
+        "to": to_date,
+        "minimumStay": min_nights
+    }
+    update_url = f"https://api.hostfully.com/v2/pricingPeriods/{uid}"
+
+    # Make the PUT request to update pricing information
+    response = requests.put(update_url, headers=headers, json=payload)
+
+    if response.status_code == 200:
+        print(f"Successfully updated pricing for property UID {uid}.")
+    else:
+        print(
+            f"Failed to update pricing for property UID {uid}. Status code: {response.status_code}, Response: {response.text}")
 
 
 def dynamic_pricing(base_rate, pricing_rules, stay_date, num_nights):
@@ -174,8 +191,15 @@ def update_all_properties_for_next_month():
 
 
 scheduler = BackgroundScheduler()
-scheduler.add_job(func=update_all_properties_for_next_month, trigger="interval", days=1)
+
+# This will run the function every day at midnight using CronTrigger
+trigger = CronTrigger(day_of_week='mon-sun', hour=0, minute=0)
+scheduler.add_job(func=update_all_properties_for_next_month, trigger=trigger)
+
+
 scheduler.start()
+
+selected_properties = []
 
 
 @app.route('/')
@@ -192,6 +216,19 @@ def index():
             property_data.append({'uid': uid, 'name': name})
 
     return render_template('index.html', properties=property_data)
+
+
+@app.route('/update_selected_properties', methods=['POST'])
+def update_selected_properties():
+    global selected_properties
+    selected_properties = request.form.getlist('selected_properties')
+    return redirect('/')
+
+
+def update_all_properties_for_next_month():
+    # Only update selected properties
+    for uid in selected_properties:
+        update_all_properties_for_next_month(uid)
 
 
 @app.route('/show_price', methods=['POST'])
