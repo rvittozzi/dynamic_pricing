@@ -58,7 +58,6 @@ def fetch_price_for_date(uid, date):
 
 
 def update_pricing_period(uid, calculated_price, from_date, to_date, min_nights):
-    # Create the data payload for the update request
     update_url = f"https://api.hostfully.com/v2/pricingperiods/"
 
     payload = {
@@ -69,7 +68,6 @@ def update_pricing_period(uid, calculated_price, from_date, to_date, min_nights)
         "minimumStay": min_nights
     }
 
-    # Make the POST request to update pricing information
     response = requests.post(update_url, headers=headers, json=payload)
 
     if response.status_code == 200:
@@ -165,7 +163,6 @@ def apply_gap_pricing(daily_rate, day, gap_sizes, gap_discounts):
 def update_pricing_periods_bulk(pricing_periods):
     update_url = "https://api.hostfully.com/v2/pricingperiodsbulk/"
 
-    # Make the POST request to update pricing information
     response = requests.post(update_url, headers=headers, json={"pricingperiods": pricing_periods})
 
     if response.status_code == 200:
@@ -176,7 +173,7 @@ def update_pricing_periods_bulk(pricing_periods):
 
 
 def update_all_properties_for_next_month():
-    pricing_periods_to_update = []  # Store pricing period updates here
+    pricing_periods_to_update = []
 
     today = datetime.today()
     one_month_later = today + timedelta(days=30)
@@ -193,11 +190,11 @@ def update_all_properties_for_next_month():
     for uid in uids:
         base_rate = fetch_base_rate(uid)
         pricing_rules = fetch_pricing_rules(uid)
-        min_nights = 1  # You may want to dynamically fetch this value
+        min_nights = 1
 
-        for n in range(1, 31):  # From 1 to 30 for each day in the next month
+        for n in range(1, 31):
             start_date = today + timedelta(days=n)
-            end_date = start_date + timedelta(days=1)  # Assuming end date is one day after the start date
+            end_date = start_date + timedelta(days=1)
             num_nights = (one_month_later - start_date).days
 
             daily_rate = fetch_price_for_date(uid, start_date.strftime('%Y-%m-%d'))
@@ -285,10 +282,8 @@ def show_price():
 
         daily_rate = dynamic_pricing(daily_rate, pricing_rules, day, num_nights)
 
-        # Apply weekend rate
         daily_rate = apply_weekend_rate(daily_rate, day, weekend_increase_percent=20, min_weekend_nights=2)
 
-        # Apply last-minute discount
         today = datetime.now()
         daily_rate = apply_last_minute_discount(daily_rate, day, today, [1, 3, 5], [30, 20, 10])
 
@@ -298,12 +293,11 @@ def show_price():
         ]
         daily_rate = apply_seasonal_rate(daily_rate, day, seasonal_rates)
 
-        # Apply gap pricing
         daily_rate = apply_gap_pricing(daily_rate, day, gap_sizes, gap_discounts)
 
         total_price += daily_rate
 
-    detected_gap = 1  # Placeholder; replace with real gap detection
+    detected_gap = 1
     if detected_gap < 2:
         minimum_stay_applied = 1
 
