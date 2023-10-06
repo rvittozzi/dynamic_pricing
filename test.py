@@ -65,10 +65,10 @@ def update_pricing_period(uid, calculated_price, from_date, to_date, min_nights)
         "to": to_date,
         "minimumStay": min_nights
     }
-    update_url = f"https://api.hostfully.com/v2/pricingPeriods/{uid}"
+    update_url = f"https://api.hostfully.com/v2/pricingperiods/{uid}"
 
     # Make the PUT request to update pricing information
-    response = requests.put(update_url, headers=headers, json=payload)
+    response = requests.post(update_url, headers=headers, json=payload)
 
     if response.status_code == 200:
         print(f"Successfully updated pricing for property UID {uid}.")
@@ -176,6 +176,7 @@ def update_all_properties_for_next_month():
     for uid in uids:
         base_rate = fetch_base_rate(uid)
         pricing_rules = fetch_pricing_rules(uid)
+        min_nights = 1  # Fetch minimum nights for this property, if available
         for n in range(31):  # 0 to 30 for each day in the next month
             day = today + timedelta(days=n)
             num_nights = (one_month_later - day).days
@@ -186,16 +187,16 @@ def update_all_properties_for_next_month():
 
             daily_rate = dynamic_pricing(daily_rate, pricing_rules, day, num_nights)
 
-            update_pricing_period(uid, daily_rate,
-                                  f"{day.strftime('%Y-%m-%d')} to {one_month_later.strftime('%Y-%m-%d')}", 1)
+            # Note the use of min_nights
+            update_pricing_period(uid, daily_rate, day.strftime('%Y-%m-%d'), one_month_later.strftime('%Y-%m-%d'),
+                                  min_nights)
 
 
 scheduler = BackgroundScheduler()
 
 # This will run the function every day at midnight using CronTrigger
-trigger = CronTrigger(day_of_week='mon-sun', hour=0, minute=0)
-scheduler.add_job(func=update_all_properties_for_next_month, trigger=trigger)
-
+trigger = CronTrigger(day_of_week='mon-sun', hour=21, minute=59)
+scheduler.add_job(func=update_all_properties_for_next_month, trigger=trigger, id='update_pricing')
 
 scheduler.start()
 

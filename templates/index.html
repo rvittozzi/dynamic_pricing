@@ -2,6 +2,35 @@
 <html>
 <head>
     <title>Property Pricing</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 50px;
+            background-color: #f5f5f5;
+        }
+        form {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        label, select, input[type="date"], input[type="number"], input[type="checkbox"] {
+            width: 100%;
+            margin-bottom: 15px;
+        }
+        input[type="submit"] {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        input[type="submit"]:hover {
+            background-color: #0056b3;
+        }
+    </style>
 </head>
 <body>
     <!-- Manual Pricing Query Form -->
@@ -10,32 +39,20 @@
         <label for="property_uid">Select Property:</label>
         <select name="property_uid" id="property_uid">
             {% for property in properties %}
-                <option value="{{ property.uid }}">{{ property.name }}</option>
+            <option value="{{ property.uid }}">{{ property.name }}</option>
             {% endfor %}
         </select>
-        <br>
 
         <label for="from_date">From Date:</label>
         <input type="date" id="from_date" name="from_date">
-        <br>
+
         <label for="to_date">To Date:</label>
         <input type="date" id="to_date" name="to_date">
-        <br>
+
         <label for="min_nights">Minimum Nights:</label>
         <input type="number" id="min_nights" name="min_nights" min="2">
-        <br>
 
         <input type="submit" value="Submit">
-    </form>
-
-    <!-- Automatic Daily Pricing Update Form -->
-    <form action="/update_selected_properties" method="post">
-        <h2>Select Properties for Daily Pricing Update</h2>
-        {% for property in properties %}
-            <input type="checkbox" name="selected_properties" value="{{ property.uid }}">
-            <label for="{{ property.uid }}">{{ property.name }}</label><br>
-        {% endfor %}
-        <input type="submit" value="Update Selected Properties">
     </form>
 </body>
 </html>
