@@ -2,57 +2,67 @@
 <html>
 <head>
     <title>Property Pricing</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 50px;
-            background-color: #f5f5f5;
-        }
-        form {
-            background-color: #fff;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-            margin-bottom: 20px;
-        }
-        label, select, input[type="date"], input[type="number"], input[type="checkbox"] {
-            width: 100%;
-            margin-bottom: 15px;
-        }
-        input[type="submit"] {
-            background-color: #007bff;
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-        }
-        input[type="submit"]:hover {
-            background-color: #0056b3;
-        }
-    </style>
 </head>
 <body>
-    <!-- Manual Pricing Query Form -->
-    <form method="post" action="/show_price">
-        <h2>Manual Price Query</h2>
+    <form action="/show_price" method="post">
         <label for="property_uid">Select Property:</label>
-        <select name="property_uid" id="property_uid">
+        <select name="property_uid">
             {% for property in properties %}
             <option value="{{ property.uid }}">{{ property.name }}</option>
             {% endfor %}
         </select>
-
+        <br>
         <label for="from_date">From Date:</label>
-        <input type="date" id="from_date" name="from_date">
-
+        <input type="date" name="from_date">
+        <br>
         <label for="to_date">To Date:</label>
-        <input type="date" id="to_date" name="to_date">
-
-        <label for="min_nights">Minimum Nights:</label>
-        <input type="number" id="min_nights" name="min_nights" min="2">
-
-        <input type="submit" value="Submit">
+        <input type="date" name="to_date">
+        <br>
+        <label for="minimum_stay">Minimum Stay:</label>
+        <input type="number" name="minimum_stay" min="1">
+        <br>
+        <!-- Add new fields here -->
+        <label for="weekend_increase_percent">Weekend Increase (%):</label>
+        <input type="number" name="weekend_increase_percent">
+        <br>
+        <label for="last_minute_days">Last-Minute Discount Days (comma-separated):</label>
+        <input type="text" name="last_minute_days">
+        <br>
+        <label for="last_minute_discounts">Last-Minute Discount Percentages (comma-separated):</label>
+        <input type="text" name="last_minute_discounts">
+        <br>
+        <input type="submit" value="Calculate">
     </form>
+  <div id="results">
+        <!-- Results will go here -->
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const form = document.getElementById('calculatorForm');
+            const resultsDiv = document.getElementById('results');
+
+            form.addEventListener('submit', async function (e) {
+                e.preventDefault();
+                const formData = new FormData(form);
+
+                const response = await fetch('/show_price', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const dailyRates = await response.json();
+
+                let tableHtml = '<table><tr><th>Date</th><th>Rate</th></tr>';
+
+                dailyRates.forEach(function (item) {
+                    tableHtml += `<tr><td>${item.day}</td><td>${item.rate}</td></tr>`;
+                });
+
+                tableHtml += '</table>';
+                resultsDiv.innerHTML = tableHtml;
+            });
+        });
+    </script>
 </body>
 </html>

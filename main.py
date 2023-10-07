@@ -1,5 +1,4 @@
 import json
-import math
 from datetime import datetime, timedelta
 
 import requests
@@ -134,6 +133,10 @@ def apply_weekend_rate(daily_rate, day, weekend_increase_percent, min_weekend_ni
 
 
 def apply_last_minute_discount(daily_rate, day, today, discount_days, discount_percents):
+    # Convert day to a date object
+    if isinstance(day, datetime):
+        day = day.date()
+
     for days, percent in zip(discount_days, discount_percents):
         if today + timedelta(days=days) >= day:
             return daily_rate * (1 - percent / 100)
@@ -237,71 +240,48 @@ def update_selected_properties():
     return redirect('/')
 
 
-def update_all_properties_for_next_month():
-    # Only update selected properties
-    for uid in selected_properties:
-        update_all_properties_for_next_month(uid)
-
-
 @app.route('/show_price', methods=['POST'])
 def show_price():
-    property_uid = request.form.get('property_uid')
-    from_date = request.form.get('from_date')
-    to_date = request.form.get('to_date')
-    minimum_stay = max(int(request.form.get('minimum_stay', 2)), 2)
+    # Existing fields
+    property_uid = request.form['property_uid']
+    from_date = datetime.strptime(request.form['from_date'], "%Y-%m-%d")
+    to_date = datetime.strptime(request.form['to_date'], "%Y-%m-%d")
+    minimum_stay = int(request.form['minimum_stay'])
+    min_weekend_nights = int(request.form.get('min_weekend_nights', 1))  # default to 1 if not provided
 
-    print("Debugging: Fetching pricing rule keys...")
-    fetch_pricing_rules_keys(property_uid)
+    weekend_increase_percent = float(request.form.get('weekend_increase_percent', 0))
+    last_minute_days_str = request.form.get('last_minute_days', '')
+    last_minute_discounts_str = request.form.get('last_minute_discounts', '')
 
-    pricing_rules = fetch_pricing_rules(property_uid)
+    # New: Get seasonal_rates from user input
+    seasonal_rates_str = request.form.get('seasonal_rates', '[]')
+    seasonal_rates = json.loads(seasonal_rates_str)  # parse the JSON string to Python list
 
-    from_date_obj = datetime.strptime(from_date, '%Y-%m-%d')
-    to_date_obj = datetime.strptime(to_date, '%Y-%m-%d')
-    num_nights = (to_date_obj - from_date_obj).days
+    last_minute_days = list(map(int, last_minute_days_str.split(','))) if last_minute_days_str else []
+    last_minute_discounts = [float(x) / 100 for x in
+                             last_minute_discounts_str.split(',')] if last_minute_discounts_str else []
 
-    if num_nights < minimum_stay:
-        return "The number of nights should be at least the minimum stay."
+    # New: Get gap_discounts from user input
+    gap_discounts_str = request.form.get('gap_discounts', '[]')  # Assuming you want to provide a default of empty list
+    gap_discounts = json.loads(gap_discounts_str)  # Parse the JSON string to a Python list
 
-    total_price = 0
-
-    gap_sizes = [2, 3, 4]
-    gap_discounts = [10, 20, 30]
-    minimum_stay_applied = minimum_stay
-
-    for i in range(num_nights):
-        day = from_date_obj + timedelta(days=i)
-
-        daily_rate = fetch_price_for_date(property_uid, day.strftime('%Y-%m-%d'))
-        if daily_rate == 0:
-            base_rate = fetch_base_rate(property_uid)
-            if base_rate is None:
-                return "Failed to fetch base rate for the property."
-            daily_rate = base_rate
-
-        daily_rate = dynamic_pricing(daily_rate, pricing_rules, day, num_nights)
-
-        daily_rate = apply_weekend_rate(daily_rate, day, weekend_increase_percent=20, min_weekend_nights=2)
-
-        today = datetime.now()
-        daily_rate = apply_last_minute_discount(daily_rate, day, today, [1, 3, 5], [30, 20, 10])
-
-        # Apply seasonal rate
-        seasonal_rates = [
-            {'start': datetime(today.year, 12, 31), 'end': datetime(today.year, 1, 2), 'percent': 20, 'min_nights': 2}
-        ]
+    daily_rates = []
+    today = datetime.now().date()
+    delta = to_date - from_date
+    for i in range(delta.days + 1):
+        day = from_date + timedelta(days=i)
+        daily_rate = fetch_base_rate(property_uid)
+        daily_rate = apply_weekend_rate(daily_rate, day, weekend_increase_percent, min_weekend_nights)
+        daily_rate = apply_last_minute_discount(daily_rate, day, today, last_minute_days, last_minute_discounts)
         daily_rate = apply_seasonal_rate(daily_rate, day, seasonal_rates)
 
-        daily_rate = apply_gap_pricing(daily_rate, day, gap_sizes, gap_discounts)
+        # Assume gap_days is a list containing the gap days. Replace this with your actual data.
+        gap_days = []
+        daily_rate = apply_gap_pricing(daily_rate, day, gap_days, gap_discounts)  # Pass gap_discounts here
 
-        total_price += daily_rate
+        daily_rates.append({"day": day.strftime("%Y-%m-%d"), "rate": daily_rate})
 
-    detected_gap = 1
-    if detected_gap < 2:
-        minimum_stay_applied = 1
-
-    total_price = math.ceil(total_price)
-
-    return f"The total price for the property from {from_date} to {to_date} is: {total_price}. Minimum stay applied: {minimum_stay_applied}"
+    return json.dumps(daily_rates), 200, {'ContentType': 'application/json'}
 
 
 if __name__ == '__main__':
