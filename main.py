@@ -3,8 +3,6 @@ import math
 from datetime import datetime, timedelta
 
 import requests
-from apscheduler.schedulers.background import BackgroundScheduler
-from apscheduler.triggers.cron import CronTrigger
 from flask import Flask, render_template, request, redirect
 
 app = Flask(__name__)
